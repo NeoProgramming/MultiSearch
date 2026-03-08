@@ -26,7 +26,11 @@ public:
 
 	// ћетоды дл€ работы с результатами
 	void addResult(const QString& fileName, const QString& fullPath, int matchCount);
+	void addResult(const QString& fileName, const QString& fullPath,
+		int matchCount, const QString& context);
 	void clearResults();
+	
+	int getResultCount() const;
 
 signals:
 	// —игнал дл€ запуска поиска
@@ -41,6 +45,7 @@ private slots:
 
 private:
 	void setupUi();
+	void updateResultsCount();
 
 	// Ёлементы управлени€
 	QLineEdit* m_pathEdit;

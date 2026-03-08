@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+п»ї#include "MainWindow.h"
 #include <QTabWidget>
 #include <QDockWidget>
 #include <QWebEngineView>
@@ -10,6 +10,9 @@
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QFileDialog>
+#include <QApplication>
+#include <QDirIterator>
+
 #include "FileExtractor.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -18,26 +21,31 @@ MainWindow::MainWindow(QWidget *parent)
 	, m_searchDockWidget(nullptr)
 	, m_searchDock(nullptr)
 {
+	// Р—Р°РіСЂСѓР¶Р°РµРј РЅР°СЃС‚СЂРѕР№РєРё
+	cfg.loadSettings();
+
 	setupUi();
 
-	// Настройки окна
+	// РќР°СЃС‚СЂРѕР№РєРё РѕРєРЅР°
 	setWindowTitle("MultiSearch");
 	resize(1200, 800);
 
 }
 
 MainWindow::~MainWindow()
-{}
+{
+	cfg.saveSettings();
+}
 
 void MainWindow::setupUi()
 {
-	// Создаем меню
+	// РЎРѕР·РґР°РµРј РјРµРЅСЋ
 	QMenuBar* menuBar = new QMenuBar(this);
 	QMenu* fileMenu = menuBar->addMenu("File");
 	QMenu* viewMenu = menuBar->addMenu("View");
 	QMenu* helpMenu = menuBar->addMenu("Help");
 
-	// Действия меню Файл
+	// Р”РµР№СЃС‚РІРёСЏ РјРµРЅСЋ Р¤Р°Р№Р»
 	QAction* openAsTextAction = new QAction("&Open as text...", this);
 	openAsTextAction->setShortcut(QKeySequence::Open);
 	connect(openAsTextAction, &QAction::triggered, this, &MainWindow::onFileOpenAsText);
@@ -52,46 +60,46 @@ void MainWindow::setupUi()
 
 
 
-	// Действия меню Вид
+	// Р”РµР№СЃС‚РІРёСЏ РјРµРЅСЋ Р’РёРґ
 	QAction* toggleSearchDockAction = new QAction("Search", this);
 	toggleSearchDockAction->setCheckable(true);
 	toggleSearchDockAction->setChecked(true);
-	// connect позже, когда создадим док-панель
+	// connect РїРѕР·Р¶Рµ, РєРѕРіРґР° СЃРѕР·РґР°РґРёРј РґРѕРє-РїР°РЅРµР»СЊ
 
 	viewMenu->addAction(toggleSearchDockAction);
 
 	setMenuBar(menuBar);
 
-	// Создаем строку статуса
+	// РЎРѕР·РґР°РµРј СЃС‚СЂРѕРєСѓ СЃС‚Р°С‚СѓСЃР°
 	QStatusBar* statusBar = new QStatusBar(this);
 	statusBar->showMessage("Ready");
 	setStatusBar(statusBar);
 
-	// Создаем док-панель поиска
+	// РЎРѕР·РґР°РµРј РґРѕРє-РїР°РЅРµР»СЊ РїРѕРёСЃРєР°
 	createSearchDock();
 
-	// Связываем действие с док-панелью
+	// РЎРІСЏР·С‹РІР°РµРј РґРµР№СЃС‚РІРёРµ СЃ РґРѕРє-РїР°РЅРµР»СЊСЋ
 	connect(toggleSearchDockAction, &QAction::toggled,
 		m_searchDockWidget, &QDockWidget::setVisible);
 
-	// Создаем область с табами
+	// РЎРѕР·РґР°РµРј РѕР±Р»Р°СЃС‚СЊ СЃ С‚Р°Р±Р°РјРё
 	createTabWidget();
 }
 
 void MainWindow::createSearchDock()
 {
-	// Создаем док-панель
+	// РЎРѕР·РґР°РµРј РґРѕРє-РїР°РЅРµР»СЊ
 	m_searchDockWidget = new QDockWidget("Search", this);
 	m_searchDockWidget->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
-	// Создаем содержимое док-панели
+	// РЎРѕР·РґР°РµРј СЃРѕРґРµСЂР¶РёРјРѕРµ РґРѕРє-РїР°РЅРµР»Рё
 	m_searchDock = new SearchDock(m_searchDockWidget);
 	m_searchDockWidget->setWidget(m_searchDock);
 
-	// Добавляем док-панель в левую область
+	// Р”РѕР±Р°РІР»СЏРµРј РґРѕРє-РїР°РЅРµР»СЊ РІ Р»РµРІСѓСЋ РѕР±Р»Р°СЃС‚СЊ
 	addDockWidget(Qt::LeftDockWidgetArea, m_searchDockWidget);
 
-	// Подключаем сигнал поиска
+	// РџРѕРґРєР»СЋС‡Р°РµРј СЃРёРіРЅР°Р» РїРѕРёСЃРєР°
 	connect(m_searchDock, &SearchDock::searchRequested,
 		this, &MainWindow::onSearchRequested);
 	connect(m_searchDock, &SearchDock::fileDoubleClicked,
@@ -100,18 +108,18 @@ void MainWindow::createSearchDock()
 
 void MainWindow::createTabWidget()
 {
-	// Создаем виджет с табами
+	// РЎРѕР·РґР°РµРј РІРёРґР¶РµС‚ СЃ С‚Р°Р±Р°РјРё
 	m_tabWidget = new QTabWidget(this);
 	m_tabWidget->setTabsClosable(true);
 	m_tabWidget->setMovable(true);
 
-	// Подключаем сигналы
+	// РџРѕРґРєР»СЋС‡Р°РµРј СЃРёРіРЅР°Р»С‹
 	connect(m_tabWidget, &QTabWidget::tabCloseRequested,
 		this, &MainWindow::onTabCloseRequested);
 	connect(m_tabWidget, &QTabWidget::currentChanged,
 		this, &MainWindow::onCurrentTabChanged);
 
-	// Создаем приветственный таб
+	// РЎРѕР·РґР°РµРј РїСЂРёРІРµС‚СЃС‚РІРµРЅРЅС‹Р№ С‚Р°Р±
 	QWebEngineView* welcomeView = new QWebEngineView();
 	welcomeView->setHtml(
 		"<html><body style='font-family: sans-serif; padding: 20px;'>"
@@ -129,7 +137,7 @@ void MainWindow::createTabWidget()
 
 void MainWindow::onTabCloseRequested(int index)
 {
-	// Не закрываем последнюю вкладку
+	// РќРµ Р·Р°РєСЂС‹РІР°РµРј РїРѕСЃР»РµРґРЅСЋСЋ РІРєР»Р°РґРєСѓ
 	if (m_tabWidget->count() > 1) {
 		QWidget* tab = m_tabWidget->widget(index);
 		m_tabWidget->removeTab(index);
@@ -157,37 +165,335 @@ void MainWindow::onSearchRequested()
 		return;
 	}
 
-	if (words.isEmpty()) {
-		statusBar()->showMessage("Please enter words to search", 3000);
+	if (words.size() < 2) {
+		statusBar()->showMessage("Please enter at least two words", 3000);
 		return;
 	}
 
-	statusBar()->showMessage(QString("Searching for '%1' in %2...")
-		.arg(words.join(" "))
-		.arg(path));
+	// Р‘РµСЂРµРј С‚РѕР»СЊРєРѕ РїРµСЂРІС‹Рµ РґРІР° СЃР»РѕРІР° РґР»СЏ РЅР°С‡Р°Р»Р°
+	QString word1 = words[0];
+	QString word2 = words[1];
 
-	// Очищаем предыдущие результаты
+	statusBar()->showMessage(QString("Searching for '%1' and '%2' in %3...")
+		.arg(word1, word2, path), 0);
+
+	// РћС‡РёС‰Р°РµРј РїСЂРµРґС‹РґСѓС‰РёРµ СЂРµР·СѓР»СЊС‚Р°С‚С‹
 	m_searchDock->clearResults();
 
-	// TODO: здесь будет реальный поиск
-	// Пока добавим тестовые данные
-	m_searchDock->addResult("test1.html", "C:\\test1.html", 3);
-	m_searchDock->addResult("test2.html", "C:\\test2.html", 5);
+	// РќР°СЃС‚СЂРѕР№РєРё РїРѕРёСЃРєР°
+	SearchEngine::Config config;
+	config.caseSensitive = m_searchDock->isCaseSensitive();
+	config.radius = m_searchDock->getSearchRadius();
+	SearchEngine searcher(config);
+
+	QFileInfo pathInfo(path);
+	int totalMatches = 0;
+
+	if (pathInfo.isFile()) {
+		// РџРѕРёСЃРє РІ РѕРґРЅРѕРј С„Р°Р№Р»Рµ
+		processFile(path, word1, word2, searcher, totalMatches);
+	}
+	else if (pathInfo.isDir()) {
+		// РџРѕРёСЃРє РІ РґРёСЂРµРєС‚РѕСЂРёРё СЂРµРєСѓСЂСЃРёРІРЅРѕ
+		QDirIterator it(path, QDir::Files, QDirIterator::Subdirectories);
+		int fileCount = 0;
+
+		while (it.hasNext()) {
+			QString filePath = it.next();
+			// Р¤РёР»СЊС‚СЂСѓРµРј С‚РѕР»СЊРєРѕ С‚РµРєСЃС‚РѕРІС‹Рµ С„Р°Р№Р»С‹
+			if (filePath.endsWith(".txt", Qt::CaseInsensitive)) {
+				processFile(filePath, word1, word2, searcher, totalMatches);
+
+				fileCount++;
+				if (fileCount % 10 == 0) {
+					statusBar()->showMessage(QString("Processed %1 files...")
+						.arg(fileCount));
+					QApplication::processEvents();
+				}
+			}
+		}
+	}
+
+	statusBar()->showMessage(QString("Search completed. Found %1 matches in %2 files.")
+		.arg(totalMatches)
+		.arg(m_searchDock->getResultCount()), 5000);
+}
+
+void MainWindow::processFile(const QString& filePath,
+	const QString& word1,
+	const QString& word2,
+	const SearchEngine& searcher,
+	int& totalMatches)
+{
+	qDebug() << "Processing file:" << filePath;
+
+	QString text = FileExtractor::loadFile(filePath, FileExtractor::ExtractTextOnly);
+	if (text.isEmpty()) {
+		qDebug() << "File is empty or could not be loaded";
+		return;
+	}
+
+	qDebug() << "Text length:" << text.length();
+
+	auto matches = searcher.findTwoWords(text, word1, word2);
+
+	qDebug() << "Found matches:" << matches.size();
+
+	if (!matches.isEmpty()) {
+		QFileInfo fileInfo(filePath);
+		QString context = matches.first().surroundingText;
+		m_searchDock->addResult(fileInfo.fileName(), filePath,
+			matches.size(), context);
+		totalMatches += matches.size();
+
+		// РЎРѕС…СЂР°РЅСЏРµРј РІСЃРµ СЃРѕРІРїР°РґРµРЅРёСЏ РґР»СЏ СЌС‚РѕРіРѕ С„Р°Р№Р»Р°
+		m_fileMatches[filePath] = matches;
+		qDebug() << "Saved matches for" << filePath << "count:" << matches.size();
+	}
 }
 
 void MainWindow::onFileDoubleClicked(const QString& filePath)
 {
-	statusBar()->showMessage(QString("Opening: %1").arg(filePath), 3000);
+	if (!m_fileMatches.contains(filePath)) {
+		statusBar()->showMessage("No match data for this file", 3000);
+		return;
+	}
 
-	// TODO: здесь будет открытие файла в новой вкладке
-	// Создаем новый WebEngineView
+	const auto& matches = m_fileMatches[filePath];
+	if (matches.isEmpty()) return;
+
+	// РћС‚РєСЂС‹РІР°РµРј С„Р°Р№Р» Рё РїРѕРґСЃРІРµС‡РёРІР°РµРј РїРµСЂРІРѕРµ СЃРѕРІРїР°РґРµРЅРёРµ
+	openFileWithHighlights(filePath, matches);
+}
+
+void MainWindow::openFileWithHighlights(const QString& filePath,
+	const QVector<SearchMatch>& matches)
+{
 	QWebEngineView* view = new QWebEngineView();
-	view->setUrl(QUrl::fromLocalFile(filePath));
 
-	// Добавляем вкладку
-	QFileInfo fileInfo(filePath);
-	int index = m_tabWidget->addTab(view, fileInfo.fileName());
+	QString text = FileExtractor::loadFile(filePath, FileExtractor::ExtractFull);
+
+	if (text.isEmpty()) {
+		view->setHtml("<html><body>Error loading file</body></html>");
+		int index = m_tabWidget->addTab(view, QFileInfo(filePath).fileName());
+		m_tabWidget->setCurrentIndex(index);
+		return;
+	}
+
+	// Р“РµРЅРµСЂРёСЂСѓРµРј HTML
+	QString html = generateHighlightedHtml(text, matches);
+
+	// РЎРѕР·РґР°РµРј РІСЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р» РІ СЃРёСЃС‚РµРјРЅРѕР№ temp РґРёСЂРµРєС‚РѕСЂРёРё
+	QString tempDir = QDir::temp().absoluteFilePath("multisearch");
+	QDir().mkpath(tempDir);
+
+	QString tempFilePath = tempDir + "/" +
+		QFileInfo(filePath).fileName() + "_" +
+		QString::number(QDateTime::currentMSecsSinceEpoch()) +
+		".html";
+
+	QFile tempFile(tempFilePath);
+	if (tempFile.open(QIODevice::WriteOnly)) {
+		tempFile.write(html.toUtf8());
+		tempFile.close();
+		qDebug() << "Saved highlighted file to:" << tempFilePath;
+
+		view->setUrl(QUrl::fromLocalFile(tempFilePath));
+
+		// РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: СѓРґР°Р»РёС‚СЊ РІСЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р» РїСЂРё Р·Р°РєСЂС‹С‚РёРё РІРєР»Р°РґРєРё
+		connect(view, &QObject::destroyed, [tempFilePath]() {
+			QFile::remove(tempFilePath);
+		});
+	}
+	else {
+		// Fallback
+		view->setHtml(html.left(1000000)); // РўРѕР»СЊРєРѕ РЅР°С‡Р°Р»Рѕ С„Р°Р№Р»Р°
+	}
+
+	int index = m_tabWidget->addTab(view, QFileInfo(filePath).fileName());
 	m_tabWidget->setCurrentIndex(index);
+}
+
+QString MainWindow::generateHighlightedHtml(const QString& text,
+	const QVector<SearchMatch>& matches)
+{
+	QString html = "<!DOCTYPE html>\n"
+		"<html>\n"
+		"<head>\n"
+		"    <meta charset='utf-8'>\n"
+		"    <style>\n"
+		"        body { \n"
+		"            font-family: 'Segoe UI', Arial, sans-serif; \n"
+		"            line-height: 1.6;\n"
+		"            padding: 20px; \n"
+		"            max-width: 900px;\n"
+		"            margin: 0 auto;\n"
+		"            background-color: white;\n"
+		"            color: #333;\n"
+		"        }\n"
+		"        p { \n"
+		"            margin: 0 0 1em 0;\n"
+		"            text-align: justify;\n"
+		"        }\n"
+		"        .empty-line {\n"
+		"            height: 1em;\n"
+		"        }\n"
+		"        .match { \n"
+		"            background-color: #ffff00; \n"
+		"            font-weight: 500;\n"
+		"            padding: 2px 0;\n"
+		"            border-radius: 3px;\n"
+		"        }\n"
+		"        .match-info { \n"
+		"            position: sticky; \n"
+		"            top: 0; \n"
+		"            background: #f8f9fa; \n"
+		"            padding: 10px 20px; \n"
+		"            border-bottom: 2px solid #0078d7;\n"
+		"            margin-bottom: 20px;\n"
+		"            z-index: 1000;\n"
+		"            font-size: 14px;\n"
+		"            box-shadow: 0 2px 5px rgba(0,0,0,0.1);\n"
+		"        }\n"
+		"        .match-counter {\n"
+		"            font-weight: bold;\n"
+		"            color: #0078d7;\n"
+		"        }\n"
+		"    </style>\n"
+		"</head>\n"
+		"<body>\n";
+
+	// РРЅС„РѕСЂРјР°С†РёРѕРЅРЅР°СЏ РїР°РЅРµР»СЊ
+	html += QString("<div class='match-info'>"
+		"РќР°Р№РґРµРЅРѕ <span class='match-counter'>%1</span> %2"
+		"</div>\n")
+		.arg(matches.size())
+		.arg(matches.size() == 1 ? "СЃРѕРІРїР°РґРµРЅРёРµ" :
+		(matches.size() < 5 ? "СЃРѕРІРїР°РґРµРЅРёСЏ" : "СЃРѕРІРїР°РґРµРЅРёР№"));
+
+	// Р Р°Р·Р±РёРІР°РµРј РЅР° СЃС‚СЂРѕРєРё, СЃРѕС…СЂР°РЅСЏСЏ РїСѓСЃС‚С‹Рµ
+	QStringList lines = text.split('\n');
+
+	int currentPos = 0;
+	for (const QString& line : lines) {
+		if (line.isEmpty()) {
+			// РџСѓСЃС‚Р°СЏ СЃС‚СЂРѕРєР° - РІСЃС‚Р°РІР»СЏРµРј СЂР°Р·РґРµР»РёС‚РµР»СЊ
+			html += "<div class='empty-line'></div>\n";
+			currentPos++;
+			continue;
+		}
+
+		html += "<p>";
+
+		int lineStart = currentPos;
+		int lineEnd = lineStart + line.length();
+
+		// РќР°С…РѕРґРёРј РІСЃРµ СЃРѕРІРїР°РґРµРЅРёСЏ РІ СЌС‚РѕР№ СЃС‚СЂРѕРєРµ
+		int lastPos = lineStart;
+		for (const auto& match : matches) {
+			if (match.startPos >= lineEnd) break;
+
+			if (match.endPos > lineStart && match.startPos < lineEnd) {
+				// РўРµРєСЃС‚ РґРѕ СЃРѕРІРїР°РґРµРЅРёСЏ
+				if (match.startPos > lastPos) {
+					html += line.mid(lastPos - lineStart,
+						match.startPos - lastPos).toHtmlEscaped();
+				}
+
+				// РџРѕРґСЃРІРµС‡РµРЅРЅРѕРµ СЃРѕРІРїР°РґРµРЅРёРµ
+				int matchStartInLine = qMax(match.startPos, lineStart) - lineStart;
+				int matchEndInLine = qMin(match.endPos, lineEnd) - lineStart;
+
+				html += "<span class='match'>";
+				html += line.mid(matchStartInLine,
+					matchEndInLine - matchStartInLine).toHtmlEscaped();
+				html += "</span>";
+
+				lastPos = qMin(match.endPos, lineEnd);
+			}
+		}
+
+		// РћСЃС‚Р°С‚РѕРє СЃС‚СЂРѕРєРё
+		if (lastPos < lineEnd) {
+			html += line.mid(lastPos - lineStart).toHtmlEscaped();
+		}
+
+		html += "</p>\n";
+		currentPos = lineEnd + 1; // +1 Р·Р° РїСЂРѕРїСѓС‰РµРЅРЅС‹Р№ \n
+	}
+
+	html += "</body>\n</html>";
+
+	return html;
+}
+
+QString MainWindow::generateHighlightedHtml2(const QString& text,
+	const QVector<SearchMatch>& matches)
+{
+	QString html = "<!DOCTYPE html>\n"
+		"<html>\n"
+		"<head>\n"
+		"    <meta charset='utf-8'>\n"
+		"    <style>\n"
+		"        body { \n"
+		"            font-family: 'Courier New', monospace; \n"
+		"            white-space: pre-wrap; \n"
+		"            padding: 20px; \n"
+		"            background-color: white;\n"
+		"            color: black;\n"
+		"        }\n"
+		"        .match { \n"
+		"            background-color: #ffff00; \n"
+		"            font-weight: bold; \n"
+		"        }\n"
+		"        .match-info { \n"
+		"            position: fixed; \n"
+		"            top: 10px; \n"
+		"            right: 10px; \n"
+		"            background: white; \n"
+		"            padding: 5px 10px; \n"
+		"            border: 1px solid #ccc; \n"
+		"            border-radius: 3px;\n"
+		"            box-shadow: 0 2px 5px rgba(0,0,0,0.1);\n"
+		"        }\n"
+		"    </style>\n"
+		"</head>\n"
+		"<body>\n";
+
+	html += QString("<div class='match-info'>Found %1 match%2</div>\n")
+		.arg(matches.size())
+		.arg(matches.size() == 1 ? "" : "es");
+
+	html += "<pre>";
+
+	int lastPos = 0;
+	for (int i = 0; i < matches.size(); ++i) {
+		const auto& match = matches[i];
+
+		if (match.startPos < lastPos || match.startPos > text.length() ||
+			match.endPos > text.length()) {
+			qDebug() << "Invalid match positions:" << match.startPos << match.endPos;
+			continue;
+		}
+
+		// РўРµРєСЃС‚ РґРѕ СЃРѕРІРїР°РґРµРЅРёСЏ
+		html += text.mid(lastPos, match.startPos - lastPos).toHtmlEscaped();
+
+		// РџРѕРґСЃРІРµС‡РµРЅРЅРѕРµ СЃРѕРІРїР°РґРµРЅРёРµ
+		html += "<span class='match'>";
+		html += text.mid(match.startPos, match.endPos - match.startPos).toHtmlEscaped();
+		html += "</span>";
+
+		lastPos = match.endPos;
+	}
+
+	if (lastPos < text.length()) {
+		html += text.mid(lastPos).toHtmlEscaped();
+	}
+
+	html += "</pre>\n</body>\n</html>";
+
+	return html;
 }
 
 void MainWindow::onFileOpenAsText()
@@ -204,7 +510,7 @@ void MainWindow::onFileOpenAsText()
 
 	statusBar()->showMessage(QString("Loading: %1").arg(filePath));
 
-	// Загружаем и декодируем файл
+	// Р—Р°РіСЂСѓР¶Р°РµРј Рё РґРµРєРѕРґРёСЂСѓРµРј С„Р°Р№Р»
 	QString decodedText = FileExtractor::loadFile(filePath);
 
 	if (decodedText.isEmpty()) {
@@ -212,11 +518,11 @@ void MainWindow::onFileOpenAsText()
 		return;
 	}
 
-	// Создаем информативный заголовок для таба
+	// РЎРѕР·РґР°РµРј РёРЅС„РѕСЂРјР°С‚РёРІРЅС‹Р№ Р·Р°РіРѕР»РѕРІРѕРє РґР»СЏ С‚Р°Р±Р°
 	QFileInfo fileInfo(filePath);
 	QString tabTitle = QString("[TEXT] %1").arg(fileInfo.fileName());
 
-	// Добавляем отладочную информацию о размере
+	// Р”РѕР±Р°РІР»СЏРµРј РѕС‚Р»Р°РґРѕС‡РЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ СЂР°Р·РјРµСЂРµ
 	QString debugInfo = QString(
 		"File: %1\n"
 		"Size: %2 bytes\n"
@@ -227,7 +533,7 @@ void MainWindow::onFileOpenAsText()
 		.arg(decodedText.length());
 
 	QString displayText = debugInfo + decodedText;
-	// Показываем первые 500 символов для проверки
+	// РџРѕРєР°Р·С‹РІР°РµРј РїРµСЂРІС‹Рµ 500 СЃРёРјРІРѕР»РѕРІ РґР»СЏ РїСЂРѕРІРµСЂРєРё
 //	QString displayText = debugInfo + decodedText.left(500);
 //	if (decodedText.length() > 500) {
 //		displayText += "\n\n...[truncated]...";
@@ -242,7 +548,7 @@ void MainWindow::onFileOpenAsText()
 
 void MainWindow::createTextTab(const QString& title, const QString& text)
 {
-	// Создаем простой HTML для отображения текста
+	// РЎРѕР·РґР°РµРј РїСЂРѕСЃС‚РѕР№ HTML РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ С‚РµРєСЃС‚Р°
 	QString html = QString(
 		"<!DOCTYPE html>"
 		"<html>"
@@ -257,10 +563,10 @@ void MainWindow::createTextTab(const QString& title, const QString& text)
 		"<div>%2</div>"
 		"</body>"
 		"</html>"
-	).arg(text.toHtmlEscaped().left(500).replace("\n", "<br>")) // Просто для примера, но лучше передавать чистый текст
+	).arg(text.toHtmlEscaped().left(500).replace("\n", "<br>")) // РџСЂРѕСЃС‚Рѕ РґР»СЏ РїСЂРёРјРµСЂР°, РЅРѕ Р»СѓС‡С€Рµ РїРµСЂРµРґР°РІР°С‚СЊ С‡РёСЃС‚С‹Р№ С‚РµРєСЃС‚
 		.arg(text.toHtmlEscaped().replace("\n", "<br>"));
 
-	// Но чтобы не дублировать, лучше так:
+	// РќРѕ С‡С‚РѕР±С‹ РЅРµ РґСѓР±Р»РёСЂРѕРІР°С‚СЊ, Р»СѓС‡С€Рµ С‚Р°Рє:
 	html = QString(
 		"<!DOCTYPE html>"
 		"<html>"

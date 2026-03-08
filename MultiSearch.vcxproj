@@ -90,6 +90,8 @@
   <ItemGroup>
     <ClCompile Include="FileExtractor.cpp" />
     <ClCompile Include="SearchDock.cpp" />
+    <ClCompile Include="SearchEngine.cpp" />
+    <ClCompile Include="Settings.cpp" />
     <ClCompile Include="ted\text_encoding_detect.cpp" />
     <QtRcc Include="MainWindow.qrc" />
     <QtMoc Include="MainWindow.h" />
@@ -103,6 +105,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileExtractor.h" />
+    <ClInclude Include="SearchEngine.h" />
+    <ClInclude Include="Settings.h" />
     <ClInclude Include="ted\text_encoding_detect.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

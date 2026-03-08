@@ -13,7 +13,7 @@ public:
 	};
 
 	// Главный метод: загружает файл и возвращает Unicode текст
-	static QString loadFile(const QString& filePath, ExtractMode mode = ExtractTextOnly);
+	static QString loadFile(const QString& filePath, ExtractMode mode = ExtractFull);
 
 	// Вспомогательные методы (можно сделать public для тестирования)
 	static QString decodeQuotedPrintable(const QByteArray& data);

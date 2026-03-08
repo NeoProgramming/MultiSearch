@@ -129,6 +129,12 @@ void SearchDock::setupUi()
 	connect(m_resultsView, &QTreeView::doubleClicked, this, &SearchDock::onResultDoubleClicked);
 
 	setLayout(mainLayout);
+
+	// Обновляем заголовки колонок
+	m_resultsModel->setHorizontalHeaderLabels({ "File", "Matches", "Context" });
+
+	// Скрываем колонку с контекстом для компактности? Или показываем
+	m_resultsView->hideColumn(2); // Прячем контекст, показываем при клике
 }
 
 void SearchDock::onBrowseFileClicked()
@@ -217,6 +223,47 @@ void SearchDock::addResult(const QString& fileName, const QString& fullPath, int
 	row << nameItem << countItem;
 	m_resultsModel->appendRow(row);
 }
+
+void SearchDock::addResult(const QString& fileName, const QString& fullPath,
+	int matchCount, const QString& context)
+{
+	QList<QStandardItem*> row;
+
+	QStandardItem* nameItem = new QStandardItem(fileName);
+	nameItem->setData(fullPath, Qt::UserRole);
+	nameItem->setEditable(false);
+
+	QStandardItem* countItem = new QStandardItem(QString::number(matchCount));
+	countItem->setTextAlignment(Qt::AlignCenter);
+	countItem->setEditable(false);
+
+	QStandardItem* contextItem = new QStandardItem(context);
+	contextItem->setEditable(false);
+
+	row << nameItem << countItem << contextItem;
+	m_resultsModel->appendRow(row);
+
+	updateResultsCount();
+}
+
+void SearchDock::updateResultsCount()
+{
+	int count = m_resultsModel->rowCount();
+	QString title = "Results";
+	if (count > 0) {
+		title = QString("Results (%1)").arg(count);
+	}
+
+	// Находим группу Results и обновляем ее заголовок
+	// Для простоты можно просто установить текст где-то еще
+}
+
+int SearchDock::getResultCount() const
+{
+	return m_resultsModel->rowCount();
+}
+
+
 
 void SearchDock::clearResults()
 {
