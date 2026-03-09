@@ -25,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
 	cfg.loadSettings();
 
 	setupUi();
+	restoreUi();
 
 	// Настройки окна
 	setWindowTitle("MultiSearch");
@@ -32,8 +33,39 @@ MainWindow::MainWindow(QWidget *parent)
 
 }
 
+void MainWindow::restoreUi()
+{
+	// Восстанавливаем геометрию и состояние окна
+	if (!cfg.windowGeometry.isEmpty()) {
+		restoreGeometry(cfg.windowGeometry);
+	}
+
+	if (!cfg.windowState.isEmpty()) {
+		restoreState(cfg.windowState);
+	}
+
+	m_searchDock->setSearchPath(cfg.searchPath);
+	m_searchDock->setSearchWords(cfg.searchWords);
+
+	m_searchDock->setSearchRadius(cfg.searchRadius);
+	m_searchDock->setCaseSensitive(cfg.caseSensitive);
+	m_searchDock->setWholeWords(cfg.wholeWords);
+
+	qDebug() << "UI restored";
+}
+
 MainWindow::~MainWindow()
 {
+	// Сохраняем геометрию и состояние окна
+	cfg.windowGeometry = saveGeometry();
+	cfg.windowState = saveState();
+
+	cfg.searchPath = m_searchDock->getSearchPath();
+	cfg.searchWords = m_searchDock->getSearchWords().join(" ");
+	cfg.searchRadius = m_searchDock->getSearchRadius();
+	cfg.caseSensitive = m_searchDock->isCaseSensitive();
+	cfg.wholeWords = m_searchDock->isWholeWords();
+
 	cfg.saveSettings();
 }
 
@@ -141,7 +173,6 @@ void MainWindow::onTabCloseRequested(int index)
 	if (m_tabWidget->count() > 1) {
 		QWidget* tab = m_tabWidget->widget(index);
 		m_tabWidget->removeTab(index);
-		delete tab;
 	}
 }
 
@@ -233,11 +264,7 @@ void MainWindow::processFile(const QString& filePath,
 		return;
 	}
 
-	qDebug() << "Text length:" << text.length();
-
 	auto matches = searcher.findTwoWords(text, word1, word2);
-
-	qDebug() << "Found matches:" << matches.size();
 
 	if (!matches.isEmpty()) {
 		QFileInfo fileInfo(filePath);
@@ -246,184 +273,231 @@ void MainWindow::processFile(const QString& filePath,
 			matches.size(), context);
 		totalMatches += matches.size();
 
-		// Сохраняем все совпадения для этого файла
+		// Сохраняем matches
 		m_fileMatches[filePath] = matches;
-		qDebug() << "Saved matches for" << filePath << "count:" << matches.size();
+		qDebug() << "Saved" << matches.size() << "matches for" << filePath;
+
+		// Для отладки выведем первые несколько позиций
+		for (int i = 0; i < qMin(3, matches.size()); ++i) {
+			qDebug() << "  Match" << i << ":" << matches[i].startPos << "-" << matches[i].endPos;
+		}
 	}
 }
 
 void MainWindow::onFileDoubleClicked(const QString& filePath)
 {
+	qDebug() << "\n=== Double click ===";
+	qDebug() << "File path:" << filePath;
+
+	// Проверяем, есть ли такой файл в сохраненных результатах
 	if (!m_fileMatches.contains(filePath)) {
-		statusBar()->showMessage("No match data for this file", 3000);
+		qDebug() << "ERROR: File not found in m_fileMatches!";
+		qDebug() << "Available files:" << m_fileMatches.keys();
+
+		statusBar()->showMessage("No match data for this file (maybe search was cleared?)", 3000);
 		return;
 	}
 
 	const auto& matches = m_fileMatches[filePath];
-	if (matches.isEmpty()) return;
+	qDebug() << "Matches count:" << matches.size();
 
-	// Открываем файл и подсвечиваем первое совпадение
+	if (matches.isEmpty()) {
+		qDebug() << "ERROR: Matches list is empty!";
+		statusBar()->showMessage("No matches found in this file", 3000);
+		return;
+	}
+
+	// Проверяем первый match на валидность
+	const auto& firstMatch = matches.first();
+	qDebug() << "First match - start:" << firstMatch.startPos
+		<< "end:" << firstMatch.endPos;
+
+	// Открываем файл с подсветкой
 	openFileWithHighlights(filePath, matches);
 }
 
 void MainWindow::openFileWithHighlights(const QString& filePath,
 	const QVector<SearchMatch>& matches)
 {
-	QWebEngineView* view = new QWebEngineView();
+	qDebug() << "\n=== openFileWithHighlights ===";
+	qDebug() << "File path:" << filePath;
+	qDebug() << "Matches count:" << matches.size();
 
+	QFileInfo fileInfo(filePath);
+
+	// Проверяем существование файла
+	if (!fileInfo.exists()) {
+		qDebug() << "ERROR: File does not exist!";
+		statusBar()->showMessage("File does not exist: " + filePath, 3000);
+		return;
+	}
+
+	qDebug() << "File size:" << fileInfo.size();
+	qDebug() << "File suffix:" << fileInfo.suffix();
+
+	// Загружаем текст файла для проверки
 	QString text = FileExtractor::loadFile(filePath, FileExtractor::ExtractFull);
+	qDebug() << "Loaded text length:" << text.length();
 
 	if (text.isEmpty()) {
-		view->setHtml("<html><body>Error loading file</body></html>");
-		int index = m_tabWidget->addTab(view, QFileInfo(filePath).fileName());
+		qDebug() << "ERROR: Loaded text is empty!";
+		statusBar()->showMessage("File is empty or could not be read", 3000);
+
+		// Показываем заглушку вместо падения
+		QWebEngineView* view = new QWebEngineView();
+		view->setHtml("<html><body><h2>Error: Empty file or cannot read</h2>"
+			"<p>File: " + filePath + "</p></body></html>");
+		int index = m_tabWidget->addTab(view, fileInfo.fileName());
 		m_tabWidget->setCurrentIndex(index);
 		return;
 	}
 
-	// Генерируем HTML
+	// Проверяем matches на валидность
+	QVector<SearchMatch> validMatches;
+	for (const auto& match : matches) {
+		if (match.startPos >= 0 && match.endPos <= text.length() &&
+			match.startPos < match.endPos) {
+			validMatches.append(match);
+		}
+		else {
+			qDebug() << "WARNING: Invalid match - start:" << match.startPos
+				<< "end:" << match.endPos << "text length:" << text.length();
+		}
+	}
+
+	qDebug() << "Valid matches count:" << validMatches.size();
+
+	if (validMatches.isEmpty()) {
+		qDebug() << "ERROR: No valid matches!";
+		statusBar()->showMessage("No valid matches found in file", 3000);
+
+		// Показываем файл без подсветки
+		QWebEngineView* view = new QWebEngineView();
+		view->setHtml("<html><body><pre>" + text.toHtmlEscaped() + "</pre></body></html>");
+		int index = m_tabWidget->addTab(view, fileInfo.fileName());
+		m_tabWidget->setCurrentIndex(index);
+		return;
+	}
+
+	QString extension = fileInfo.suffix().toLower();
+	bool isHtml = (extension == "html" || extension == "htm");
+	bool isMhtml = (extension == "mht" || extension == "mhtml");
+
+	try {
+		if (isHtml || isMhtml) {
+			qDebug() << "Opening as HTML/MHTML";
+			openHtmlWithHighlights(filePath, validMatches, text);
+		}
+		else {
+			qDebug() << "Opening as text";
+			openTextWithHighlights(filePath, validMatches, text);
+		}
+	}
+	catch (const std::exception& e) {
+		qDebug() << "EXCEPTION:" << e.what();
+		statusBar()->showMessage("Error opening file: " + QString(e.what()), 3000);
+	}
+	catch (...) {
+		qDebug() << "UNKNOWN EXCEPTION";
+		statusBar()->showMessage("Unknown error opening file", 3000);
+	}
+}
+
+void MainWindow::openHtmlWithHighlights(const QString& filePath,
+	const QVector<SearchMatch>& matches,
+	const QString& text)
+{
+	QWebEngineView* view = new QWebEngineView();
+	QFileInfo fileInfo(filePath);
+
 	QString html = generateHighlightedHtml(text, matches);
 
-	// Создаем временный файл в системной temp директории
-	QString tempDir = QDir::temp().absoluteFilePath("multisearch");
-	QDir().mkpath(tempDir);
+	// Для больших HTML файлов используем временный файл
+	if (html.length() > 1024 * 1024) { // > 1MB
+		QString tempDir = QDir::temp().absoluteFilePath("multisearch");
+		QDir().mkpath(tempDir);
 
-	QString tempFilePath = tempDir + "/" +
-		QFileInfo(filePath).fileName() + "_" +
-		QString::number(QDateTime::currentMSecsSinceEpoch()) +
-		".html";
+		QString tempFilePath = tempDir + "/" + fileInfo.fileName() + "_" +
+			QString::number(QDateTime::currentMSecsSinceEpoch()) + ".html";
 
-	QFile tempFile(tempFilePath);
-	if (tempFile.open(QIODevice::WriteOnly)) {
-		tempFile.write(html.toUtf8());
-		tempFile.close();
-		qDebug() << "Saved highlighted file to:" << tempFilePath;
-
-		view->setUrl(QUrl::fromLocalFile(tempFilePath));
-
-		// Опционально: удалить временный файл при закрытии вкладки
-		connect(view, &QObject::destroyed, [tempFilePath]() {
-			QFile::remove(tempFilePath);
-		});
+		QFile tempFile(tempFilePath);
+		if (tempFile.open(QIODevice::WriteOnly)) {
+			tempFile.write(html.toUtf8());
+			tempFile.close();
+			qDebug() << "Saved temp HTML to:" << tempFilePath;
+			view->setUrl(QUrl::fromLocalFile(tempFilePath));
+		}
+		else {
+			qDebug() << "Failed to create temp file, using setHtml";
+			view->setHtml(html, QUrl::fromLocalFile(fileInfo.absolutePath() + "/"));
+		}
 	}
 	else {
-		// Fallback
-		view->setHtml(html.left(1000000)); // Только начало файла
+		view->setHtml(html, QUrl::fromLocalFile(fileInfo.absolutePath() + "/"));
 	}
 
-	int index = m_tabWidget->addTab(view, QFileInfo(filePath).fileName());
+	// Подключаем отладку загрузки
+	connect(view, &QWebEngineView::loadFinished, this,
+		[filePath](bool ok) {
+		qDebug() << "WebEngine load finished for" << filePath << "- ok:" << ok;
+	});
+
+	int index = m_tabWidget->addTab(view, fileInfo.fileName());
+	m_tabWidget->setCurrentIndex(index);
+}
+
+void MainWindow::openTextWithHighlights(const QString& filePath,
+	const QVector<SearchMatch>& matches,
+	const QString& text)
+{
+	TextTab* tab = new TextTab(filePath, text, matches);
+
+	QFileInfo fileInfo(filePath);
+	int index = m_tabWidget->addTab(tab, fileInfo.fileName());
 	m_tabWidget->setCurrentIndex(index);
 }
 
 QString MainWindow::generateHighlightedHtml(const QString& text,
 	const QVector<SearchMatch>& matches)
 {
-	QString html = "<!DOCTYPE html>\n"
-		"<html>\n"
-		"<head>\n"
-		"    <meta charset='utf-8'>\n"
-		"    <style>\n"
-		"        body { \n"
-		"            font-family: 'Segoe UI', Arial, sans-serif; \n"
-		"            line-height: 1.6;\n"
-		"            padding: 20px; \n"
-		"            max-width: 900px;\n"
-		"            margin: 0 auto;\n"
-		"            background-color: white;\n"
-		"            color: #333;\n"
-		"        }\n"
-		"        p { \n"
-		"            margin: 0 0 1em 0;\n"
-		"            text-align: justify;\n"
-		"        }\n"
-		"        .empty-line {\n"
-		"            height: 1em;\n"
-		"        }\n"
-		"        .match { \n"
-		"            background-color: #ffff00; \n"
-		"            font-weight: 500;\n"
-		"            padding: 2px 0;\n"
-		"            border-radius: 3px;\n"
-		"        }\n"
-		"        .match-info { \n"
-		"            position: sticky; \n"
-		"            top: 0; \n"
-		"            background: #f8f9fa; \n"
-		"            padding: 10px 20px; \n"
-		"            border-bottom: 2px solid #0078d7;\n"
-		"            margin-bottom: 20px;\n"
-		"            z-index: 1000;\n"
-		"            font-size: 14px;\n"
-		"            box-shadow: 0 2px 5px rgba(0,0,0,0.1);\n"
-		"        }\n"
-		"        .match-counter {\n"
-		"            font-weight: bold;\n"
-		"            color: #0078d7;\n"
-		"        }\n"
-		"    </style>\n"
-		"</head>\n"
-		"<body>\n";
+	if (text.isEmpty()) {
+		return "<html><body>Empty document</body></html>";
+	}
 
-	// Информационная панель
-	html += QString("<div class='match-info'>"
-		"Найдено <span class='match-counter'>%1</span> %2"
-		"</div>\n")
-		.arg(matches.size())
-		.arg(matches.size() == 1 ? "совпадение" :
-		(matches.size() < 5 ? "совпадения" : "совпадений"));
+	QString html = "<!DOCTYPE html><html><head><meta charset='utf-8'><style>";
+	html += "body{font-family:monospace;white-space:pre-wrap;padding:20px}";
+	html += ".match{background:#ff0}</style></head><body>";
 
-	// Разбиваем на строки, сохраняя пустые
-	QStringList lines = text.split('\n');
+	int lastPos = 0;
+	for (int i = 0; i < matches.size(); ++i) {
+		const auto& match = matches[i];
 
-	int currentPos = 0;
-	for (const QString& line : lines) {
-		if (line.isEmpty()) {
-			// Пустая строка - вставляем разделитель
-			html += "<div class='empty-line'></div>\n";
-			currentPos++;
+		// Защита от некорректных позиций
+		if (match.startPos < lastPos || match.startPos > text.length() ||
+			match.endPos > text.length() || match.startPos >= match.endPos) {
+			qDebug() << "Skipping invalid match:" << match.startPos << match.endPos;
 			continue;
 		}
 
-		html += "<p>";
-
-		int lineStart = currentPos;
-		int lineEnd = lineStart + line.length();
-
-		// Находим все совпадения в этой строке
-		int lastPos = lineStart;
-		for (const auto& match : matches) {
-			if (match.startPos >= lineEnd) break;
-
-			if (match.endPos > lineStart && match.startPos < lineEnd) {
-				// Текст до совпадения
-				if (match.startPos > lastPos) {
-					html += line.mid(lastPos - lineStart,
-						match.startPos - lastPos).toHtmlEscaped();
-				}
-
-				// Подсвеченное совпадение
-				int matchStartInLine = qMax(match.startPos, lineStart) - lineStart;
-				int matchEndInLine = qMin(match.endPos, lineEnd) - lineStart;
-
-				html += "<span class='match'>";
-				html += line.mid(matchStartInLine,
-					matchEndInLine - matchStartInLine).toHtmlEscaped();
-				html += "</span>";
-
-				lastPos = qMin(match.endPos, lineEnd);
-			}
+		// Текст до совпадения
+		if (match.startPos > lastPos) {
+			html += text.mid(lastPos, match.startPos - lastPos).toHtmlEscaped();
 		}
 
-		// Остаток строки
-		if (lastPos < lineEnd) {
-			html += line.mid(lastPos - lineStart).toHtmlEscaped();
-		}
+		// Подсвеченное совпадение
+		html += "<span class='match'>";
+		html += text.mid(match.startPos, match.endPos - match.startPos).toHtmlEscaped();
+		html += "</span>";
 
-		html += "</p>\n";
-		currentPos = lineEnd + 1; // +1 за пропущенный \n
+		lastPos = match.endPos;
 	}
 
-	html += "</body>\n</html>";
+	// Остаток текста
+	if (lastPos < text.length()) {
+		html += text.mid(lastPos).toHtmlEscaped();
+	}
 
+	html += "</body></html>";
 	return html;
 }
 

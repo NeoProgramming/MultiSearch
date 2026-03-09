@@ -292,7 +292,12 @@ QString FileExtractor::handlePlainText(const QByteArray& rawData)
 		rawData.size()
 	);
 
-	return decodeWithEncoding(rawData, encoding);
+	QString text = decodeWithEncoding(rawData, encoding);
+	// Ќормализуем концы строк к единому формату (\n)
+	text.replace("\r\n", "\n"); // Windows -> Unix
+	text.replace("\r", "\n");   // Mac Classic -> Unix
+
+	return text;
 }
 
 QString FileExtractor::decodeWithEncoding(const QByteArray& data, AutoIt::Common::TextEncodingDetect::Encoding encoding)

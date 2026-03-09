@@ -8,7 +8,9 @@ static const char INI_FILE[] = "multisearch.ini";
 	X(searchWords,		"words", "")\
 	X(windowGeometry,	"win_geometry", QVariant())\
 	X(windowState,		"win_state", QVariant())\
-	X(panelWidth,		"panel_width", Settings::DEFAULT_PANEL_WIDTH)
+	X(searchRadius,		"radius", 20)\
+	X(caseSensitive,	"case_sensitive", false)\
+	X(wholeWords,		"whole_words", false)
 
 // Qt does not QVariant.getValue() method
 template<typename T>

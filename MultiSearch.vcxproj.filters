@@ -58,9 +58,15 @@
     <ClCompile Include="Settings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="texttab.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="SearchDock.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="texttab.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

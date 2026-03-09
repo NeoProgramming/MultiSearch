@@ -112,8 +112,15 @@ void SearchDock::setupUi()
 	m_resultsView->setModel(m_resultsModel);
 	m_resultsView->setAlternatingRowColors(true);
 	m_resultsView->setSortingEnabled(true);
-	m_resultsView->header()->setStretchLastSection(true);
+	//m_resultsView->header()->setStretchLastSection(true);
 	m_resultsView->setRootIsDecorated(false);
+	// Ќастройка раст€гивани€ колонок
+	m_resultsView->header()->setStretchLastSection(false); // не раст€гивать последнюю
+	// ѕерва€ колонка (File) - раст€гиваетс€
+	m_resultsView->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+	// ¬тора€ колонка (Matches) - фиксированна€ ширина
+	m_resultsView->header()->setSectionResizeMode(1, QHeaderView::Fixed);
+	m_resultsView->setColumnWidth(1, 50);
 
 	resultsLayout->addWidget(m_resultsView);
 
@@ -205,6 +212,31 @@ bool SearchDock::isCaseSensitive() const
 bool SearchDock::isWholeWords() const
 {
 	return m_wholeWordsCheck->isChecked();
+}
+
+void SearchDock::setSearchPath(const QString& path)
+{
+	m_pathEdit->setText(path);
+}
+
+void SearchDock::setSearchWords(const QString& words)
+{
+	m_wordsEdit->setText(words);
+}
+
+void SearchDock::setSearchRadius(int radius)
+{
+	m_radiusSpin->setValue(radius);
+}
+
+void SearchDock::setCaseSensitive(bool sensitive)
+{
+	m_caseSensitiveCheck->setChecked(sensitive);
+}
+
+void SearchDock::setWholeWords(bool wholewords) 
+{
+	m_wholeWordsCheck->setChecked(wholewords);
 }
 
 // ћетоды дл€ работы с результатами

@@ -24,6 +24,13 @@ public:
 	bool isCaseSensitive() const;
 	bool isWholeWords() const;
 
+	// Новые методы для установки значений
+	void setSearchPath(const QString& path);
+	void setSearchWords(const QString& words);
+	void setSearchRadius(int radius);
+	void setCaseSensitive(bool sensitive);
+	void setWholeWords(bool wholewords);
+
 	// Методы для работы с результатами
 	void addResult(const QString& fileName, const QString& fullPath, int matchCount);
 	void addResult(const QString& fileName, const QString& fullPath,

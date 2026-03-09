@@ -3,6 +3,7 @@
 #include <QtWidgets/QMainWindow>
 #include "SearchDock.h"
 #include "SearchEngine.h"
+#include "texttab.h"
 #include "Settings.h"
 #include <QMap>
 #include <QString>
@@ -24,6 +25,7 @@ private slots:
 	void onFileOpenAsText();
 private:
 	void setupUi();
+	void restoreUi();
 	void createSearchDock();
 	void createTabWidget();
 	void createTextTab(const QString& title, const QString& text);
@@ -38,6 +40,13 @@ private:
 		const QVector<SearchMatch>& matches);
 	QString generateHighlightedHtml2(const QString& text,
 		const QVector<SearchMatch>& matches);
+
+	void openHtmlWithHighlights(const QString& filePath,
+		const QVector<SearchMatch>& matches,
+		const QString& text);
+	void openTextWithHighlights(const QString& filePath,
+		const QVector<SearchMatch>& matches,
+		const QString& text);
 
 	Settings cfg;
 	QTabWidget* m_tabWidget;
