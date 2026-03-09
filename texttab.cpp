@@ -64,17 +64,13 @@ void TextTab::setupUi()
 	// Текстовый редактор
 	m_textEdit = new QPlainTextEdit;
 	m_textEdit->setReadOnly(true);
-	m_textEdit->setFont(QFont("Consolas", 10));
+	m_textEdit->setFont(QFont("Consolas", 14));
 	
-	// ВКЛЮЧАЕМ ПЕРЕНОС СТРОК - это то, что нужно
+	// ВКЛЮЧАЕМ ПЕРЕНОС СТРОК
 	m_textEdit->setLineWrapMode(QPlainTextEdit::WidgetWidth);
 	// Дополнительные настройки для красивого переноса
 	m_textEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere); // перенос по словам
 	m_textEdit->setMaximumBlockCount(0); // без ограничений на количество блоков
-
-	// Опционально: включаем перенос для удобства чтения
-	// m_textEdit->setLineWrapMode(QPlainTextEdit::WidgetWidth);
-	// m_textEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
 
 	layout->addWidget(m_textEdit);
 

@@ -149,7 +149,7 @@ void SearchDock::onBrowseFileClicked()
 	QString filePath = QFileDialog::getOpenFileName(
 		this,
 		"Select File",
-		QString(),
+		m_pathEdit->text(),
 		"All Files (*.*);;HTML Files (*.html *.htm);;Text Files (*.txt);;MHTML Files (*.mht *.mhtml)"
 	);
 
@@ -163,7 +163,7 @@ void SearchDock::onBrowseFolderClicked()
 	QString folderPath = QFileDialog::getExistingDirectory(
 		this,
 		"Select Folder",
-		QString(),
+		m_pathEdit->text(),
 		QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
 	);
 
