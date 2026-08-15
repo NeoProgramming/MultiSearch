@@ -33,7 +33,8 @@ private:
 		const QString& word1,
 		const QString& word2,
 		const SearchEngine& searcher,
-		int& totalMatches);
+		int& totalMatches,
+		bool isSingleWord);
 	void openFileWithHighlights(const QString& filePath,
 		const QVector<SearchMatch>& matches);
 	QString generateHighlightedHtml(const QString& text,
@@ -48,10 +49,17 @@ private:
 		const QVector<SearchMatch>& matches,
 		const QString& text);
 
+	// Вспомогательные методы
+	int findOpenTab(const QString& filePath);
+	void switchToTab(int index);
+	void addNewTab(const QString& filePath, const QVector<SearchMatch>& matches);
+
 	Settings cfg;
 	QTabWidget* m_tabWidget;
 	QDockWidget* m_searchDockWidget;
 	SearchDock* m_searchDock;
 	QAction* m_openAsTextAction;
 	QMap<QString, QVector<SearchMatch>> m_fileMatches;
+	QMap<QString, QString> m_fileTexts;                // путь файла -> текст файла (для быстрого открытия)
+	QMap<QString, int> m_openTabs; // путь файла -> индекс вкладки
 };

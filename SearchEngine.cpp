@@ -36,6 +36,38 @@ QVector<int> SearchEngine::findAllPositions(const QString& text, const QString& 
 	return positions;
 }
 
+QVector<SearchMatch> SearchEngine::findOneWord(const QString& text,
+	const QString& word) const
+{
+	QVector<SearchMatch> results;
+
+	if (word.isEmpty() || text.isEmpty()) {
+		return results;
+	}
+
+	// Находим все позиции слова
+	QVector<int> positions = findAllPositions(text, word);
+
+	if (positions.isEmpty()) {
+		return results;
+	}
+
+	int wordLen = word.length();
+
+	for (int pos : positions) {
+		SearchMatch match;
+		match.startPos = pos;
+		match.endPos = pos + wordLen;
+		match.word1Pos = pos;
+		match.word2Pos = -1; // Второе слово отсутствует
+		match.surroundingText = extractContext(text, pos, 50);
+
+		results.append(match);
+	}
+
+	return results;
+}
+
 QVector<SearchMatch> SearchEngine::findTwoWords(const QString& text,
 	const QString& word1,
 	const QString& word2) const

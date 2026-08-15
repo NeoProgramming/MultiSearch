@@ -24,6 +24,9 @@ public:
 
 	SearchEngine(const Config& config = Config());
 
+	// Поиск одного слова в тексте
+	QVector<SearchMatch> findOneWord(const QString& text,
+		const QString& word) const;
 	// Поиск двух слов в тексте
 	QVector<SearchMatch> findTwoWords(const QString& text,
 		const QString& word1,

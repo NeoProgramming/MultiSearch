@@ -196,20 +196,22 @@ void MainWindow::onSearchRequested()
 		return;
 	}
 
-	if (words.size() < 2) {
-		statusBar()->showMessage("Please enter at least two words", 3000);
+	if (words.isEmpty()) {
+		statusBar()->showMessage("Please enter words to search", 3000);
 		return;
 	}
 
-	// Берем только первые два слова для начала
-	QString word1 = words[0];
-	QString word2 = words[1];
+	QApplication::setOverrideCursor(Qt::WaitCursor);
 
-	statusBar()->showMessage(QString("Searching for '%1' and '%2' in %3...")
-		.arg(word1, word2, path), 0);
+	statusBar()->showMessage(QString("Searching for '%1' in %2...")
+		.arg(words.join(" "))
+		.arg(path), 0);
+		
 
 	// Очищаем предыдущие результаты
 	m_searchDock->clearResults();
+	m_fileMatches.clear();
+	m_fileTexts.clear();
 
 	// Настройки поиска
 	SearchEngine::Config config;
@@ -220,9 +222,14 @@ void MainWindow::onSearchRequested()
 	QFileInfo pathInfo(path);
 	int totalMatches = 0;
 
+	// Определяем режим поиска
+	bool isSingleWord = (words.size() == 1);
+	QString word1 = words[0];
+	QString word2 = isSingleWord ? QString() : words[1];
+
 	if (pathInfo.isFile()) {
 		// Поиск в одном файле
-		processFile(path, word1, word2, searcher, totalMatches);
+		processFile(path, word1, word2, searcher, totalMatches, isSingleWord);
 	}
 	else if (pathInfo.isDir()) {
 		// Поиск в директории рекурсивно
@@ -232,8 +239,9 @@ void MainWindow::onSearchRequested()
 		while (it.hasNext()) {
 			QString filePath = it.next();
 			// Фильтруем только текстовые файлы
-			if (filePath.endsWith(".txt", Qt::CaseInsensitive)) {
-				processFile(filePath, word1, word2, searcher, totalMatches);
+			if (filePath.endsWith(".txt", Qt::CaseInsensitive)) 			
+			{
+				processFile(filePath, word1, word2, searcher, totalMatches, isSingleWord);
 
 				fileCount++;
 				if (fileCount % 10 == 0) {
@@ -245,6 +253,7 @@ void MainWindow::onSearchRequested()
 		}
 	}
 
+	QApplication::restoreOverrideCursor();
 	statusBar()->showMessage(QString("Search completed. Found %1 matches in %2 files.")
 		.arg(totalMatches)
 		.arg(m_searchDock->getResultCount()), 5000);
@@ -254,7 +263,8 @@ void MainWindow::processFile(const QString& filePath,
 	const QString& word1,
 	const QString& word2,
 	const SearchEngine& searcher,
-	int& totalMatches)
+	int& totalMatches,
+	bool isSingleWord)
 {
 	qDebug() << "Processing file:" << filePath;
 
@@ -264,7 +274,16 @@ void MainWindow::processFile(const QString& filePath,
 		return;
 	}
 
-	auto matches = searcher.findTwoWords(text, word1, word2);
+	QVector<SearchMatch> matches;
+	if (isSingleWord) {
+		// Поиск одного слова
+		matches = searcher.findOneWord(text, word1);
+	}
+	else {
+		// Поиск двух слов
+		matches = searcher.findTwoWords(text, word1, word2);
+	}
+
 
 	if (!matches.isEmpty()) {
 		QFileInfo fileInfo(filePath);
@@ -275,8 +294,9 @@ void MainWindow::processFile(const QString& filePath,
 
 		// Сохраняем matches
 		m_fileMatches[filePath] = matches;
-		qDebug() << "Saved" << matches.size() << "matches for" << filePath;
+		m_fileTexts[filePath] = text; 
 
+		qDebug() << "Saved" << matches.size() << "matches for" << filePath;
 		// Для отладки выведем первые несколько позиций
 		for (int i = 0; i < qMin(3, matches.size()); ++i) {
 			qDebug() << "  Match" << i << ":" << matches[i].startPos << "-" << matches[i].endPos;
@@ -284,6 +304,34 @@ void MainWindow::processFile(const QString& filePath,
 	}
 }
 
+void MainWindow::onFileDoubleClicked(const QString& filePath)
+{
+	if (!m_fileMatches.contains(filePath)) {
+		qDebug() << "No match data for file:" << filePath;
+
+		// Показываем файл без подсветки
+		QFileInfo fileInfo(filePath);
+		QWebEngineView* view = new QWebEngineView();
+		view->setUrl(QUrl::fromLocalFile(filePath));
+		view->setProperty("filePath", filePath);
+
+		int index = m_tabWidget->addTab(view, fileInfo.fileName());
+		m_tabWidget->setCurrentIndex(index);
+		m_openTabs[filePath] = index;
+		return;
+	}
+
+	const auto& matches = m_fileMatches[filePath];
+	if (matches.isEmpty()) {
+		// Файл есть в списке, но совпадений нет (может быть)
+		return;
+	}
+
+	// Открываем с подсветкой
+	openFileWithHighlights(filePath, matches);
+}
+
+/*
 void MainWindow::onFileDoubleClicked(const QString& filePath)
 {
 	qDebug() << "\n=== Double click ===";
@@ -314,7 +362,231 @@ void MainWindow::onFileDoubleClicked(const QString& filePath)
 
 	// Открываем файл с подсветкой
 	openFileWithHighlights(filePath, matches);
+}*/
+
+void MainWindow::openFileWithHighlights(const QString& filePath,
+	const QVector<SearchMatch>& matches)
+{
+	// Проверяем, не открыт ли уже этот файл
+	int existingTabIndex = findOpenTab(filePath);
+
+	if (existingTabIndex != -1) {
+		// Файл уже открыт - просто переключаемся на вкладку
+		switchToTab(existingTabIndex);
+
+		// Обновляем подсветку, если нужно (например, если поиск был обновлен)
+		// Но можно пропустить, так как пользователь уже видел этот файл
+
+		statusBar()->showMessage(QString("Switched to '%1'").arg(QFileInfo(filePath).fileName()), 2000);
+		return;
+	}
+
+	// Файл не открыт - создаем новую вкладку
+	addNewTab(filePath, matches);
 }
+
+int MainWindow::findOpenTab(const QString& filePath)
+{
+	// Проверяем по кэшу
+	if (m_openTabs.contains(filePath)) {
+		int index = m_openTabs[filePath];
+
+		// Проверяем, что вкладка действительно существует
+		if (index >= 0 && index < m_tabWidget->count()) {
+			// Проверяем, что это действительно тот же файл
+			QWidget* widget = m_tabWidget->widget(index);
+			if (widget) {
+				// Получаем путь из сохраненных данных
+				// Для TextTab
+				TextTab* textTab = qobject_cast<TextTab*>(widget);
+				if (textTab && textTab->getFilePath() == filePath) {
+					return index;
+				}
+
+				// Для QWebEngineView (HTML/MHTML)
+				QWebEngineView* webView = qobject_cast<QWebEngineView*>(widget);
+				if (webView) {
+					// Для QWebEngineView сложнее получить путь,
+					// можно хранить в свойстве
+					QString tabPath = webView->property("filePath").toString();
+					if (tabPath == filePath) {
+						return index;
+					}
+				}
+			}
+		}
+
+		// Если вкладка не найдена - удаляем из кэша
+		m_openTabs.remove(filePath);
+	}
+
+	// Если не нашли по кэшу - ищем перебором
+	for (int i = 0; i < m_tabWidget->count(); ++i) {
+		QWidget* widget = m_tabWidget->widget(i);
+
+		// Проверяем TextTab
+		TextTab* textTab = qobject_cast<TextTab*>(widget);
+		if (textTab && textTab->getFilePath() == filePath) {
+			m_openTabs[filePath] = i; // обновляем кэш
+			return i;
+		}
+
+		// Проверяем QWebEngineView
+		QWebEngineView* webView = qobject_cast<QWebEngineView*>(widget);
+		if (webView) {
+			QString tabPath = webView->property("filePath").toString();
+			if (tabPath == filePath) {
+				m_openTabs[filePath] = i; // обновляем кэш
+				return i;
+			}
+		}
+	}
+
+	return -1;
+}
+
+void MainWindow::switchToTab(int index)
+{
+	if (index >= 0 && index < m_tabWidget->count()) {
+		m_tabWidget->setCurrentIndex(index);
+
+		// Устанавливаем фокус на содержимое вкладки
+		QWidget* widget = m_tabWidget->widget(index);
+		if (widget) {
+			// Для TextTab
+			TextTab* textTab = qobject_cast<TextTab*>(widget);
+			if (textTab) {
+				textTab->setFocusToTextEdit();
+			}
+
+			// Для QWebEngineView - фокус устанавливается автоматически
+		}
+
+		//m_tabWidget->widget(index)->setFocus();
+	}
+}
+
+void MainWindow::addNewTab(const QString& filePath,
+	const QVector<SearchMatch>& matches)
+{
+	QFileInfo fileInfo(filePath);
+	QString extension = fileInfo.suffix().toLower();
+
+	bool isHtml = (extension == "html" || extension == "htm");
+	bool isMhtml = (extension == "mht" || extension == "mhtml");
+
+	int newIndex = -1;
+
+	if (isHtml || isMhtml) {
+		// Для HTML/MHTML используем QWebEngine
+		QWebEngineView* view = new QWebEngineView();
+
+		// Сохраняем путь в свойстве для идентификации
+		view->setProperty("filePath", filePath);
+
+		QString text = FileExtractor::loadFile(filePath, FileExtractor::ExtractFull);
+
+		if (text.isEmpty()) {
+			view->setHtml("<html><body><h2>Error loading file</h2></body></html>");
+		}
+		else {
+			QString html = generateHighlightedHtml(text, matches);
+
+			// Для больших HTML файлов используем временный файл
+			if (html.length() > 1024 * 1024) { // > 1MB
+				QString tempDir = QDir::temp().absoluteFilePath("multisearch");
+				QDir().mkpath(tempDir);
+
+				QString tempFilePath = tempDir + "/" + fileInfo.fileName() + "_" +
+					QString::number(QDateTime::currentMSecsSinceEpoch()) + ".html";
+
+				QFile tempFile(tempFilePath);
+				if (tempFile.open(QIODevice::WriteOnly)) {
+					tempFile.write(html.toUtf8());
+					tempFile.close();
+					view->setUrl(QUrl::fromLocalFile(tempFilePath));
+				}
+				else {
+					view->setHtml(html);
+				}
+			}
+			else {
+				view->setHtml(html);
+			}
+		}
+
+		newIndex = m_tabWidget->addTab(view, fileInfo.fileName());
+
+	}
+	else {
+		// Для текстовых файлов используем TextTab
+		if (!m_fileTexts.contains(filePath)) {
+			qWarning() << "No saved text for" << filePath;
+			return;
+		}
+
+		QString text = m_fileTexts[filePath];
+		TextTab* tab = new TextTab(filePath, text, matches);
+
+		newIndex = m_tabWidget->addTab(tab, fileInfo.fileName());
+	}
+
+	if (newIndex >= 0) {
+		// Сохраняем в кэш
+		m_openTabs[filePath] = newIndex;
+		m_tabWidget->setCurrentIndex(newIndex);
+
+		// Устанавливаем фокус на новую вкладку
+		QWidget* widget = m_tabWidget->widget(newIndex);
+		if (widget) {
+			TextTab* textTab = qobject_cast<TextTab*>(widget);
+			if (textTab) {
+				textTab->setFocusToTextEdit();
+			}
+		}
+
+		// Подключаем обработчик закрытия вкладки для очистки кэша
+		connect(m_tabWidget, &QTabWidget::tabCloseRequested,
+			this, &MainWindow::onTabCloseRequested);
+	}
+}
+/*
+void MainWindow::onTabCloseRequested(int index)
+{
+	if (index < 0 || index >= m_tabWidget->count()) return;
+
+	// Не закрываем последнюю вкладку
+	if (m_tabWidget->count() <= 1) {
+		return;
+	}
+
+	QWidget* widget = m_tabWidget->widget(index);
+
+	// Удаляем из кэша
+	QString filePathToRemove;
+	for (auto it = m_openTabs.begin(); it != m_openTabs.end(); ++it) {
+		if (it.value() == index) {
+			filePathToRemove = it.key();
+			break;
+		}
+	}
+
+	if (!filePathToRemove.isEmpty()) {
+		m_openTabs.remove(filePathToRemove);
+	}
+
+	// Удаляем вкладку
+	m_tabWidget->removeTab(index);
+	delete widget;
+
+	// Обновляем индексы в кэше для вкладок после удаленной
+	for (auto it = m_openTabs.begin(); it != m_openTabs.end(); ++it) {
+		if (it.value() > index) {
+			it.value()--;
+		}
+	}
+}
+
 
 void MainWindow::openFileWithHighlights(const QString& filePath,
 	const QVector<SearchMatch>& matches)
@@ -402,6 +674,7 @@ void MainWindow::openFileWithHighlights(const QString& filePath,
 		statusBar()->showMessage("Unknown error opening file", 3000);
 	}
 }
+*/
 
 void MainWindow::openHtmlWithHighlights(const QString& filePath,
 	const QVector<SearchMatch>& matches,

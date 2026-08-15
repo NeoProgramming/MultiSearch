@@ -97,6 +97,24 @@ void TextTab::setupUi()
 	// Настройки отображения
 	m_textEdit->setCenterOnScroll(true);
 	m_textEdit->setCursorWidth(2);
+
+	// Подключаемся к сигналу показа виджета
+	connect(this, &QWidget::show, this, &TextTab::onTabShown);
+}
+
+void TextTab::setFocusToTextEdit()
+{
+	if (m_textEdit) {
+		m_textEdit->setFocus(Qt::OtherFocusReason);
+		// Обновляем выделение, чтобы оно стало ярким
+		highlightCurrentMatch();
+	}
+}
+
+void TextTab::onTabShown()
+{
+	// При показе вкладки устанавливаем фокус на текстовый редактор
+	setFocusToTextEdit();
 }
 
 void TextTab::highlightMatches()
@@ -166,6 +184,8 @@ void TextTab::findInText()
 			m_textEdit->setTextCursor(cursor);
 			m_textEdit->find(text);
 		}
+
+		
 	}
 }
 

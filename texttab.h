@@ -22,12 +22,14 @@ public:
 	
 	QString getFilePath() const { return m_filePath; }
 	QString getTabTitle() const { return QFileInfo(m_filePath).fileName(); }
+	void setFocusToTextEdit();
 
 private slots:
 	void nextMatch();
 	void prevMatch();
 	void copySelection();
 	void findInText();
+	void onTabShown();
 
 private:
 	void setupUi();
@@ -35,7 +37,7 @@ private:
 	void highlightCurrentMatch();
 	void updateMatchLabel();
 	bool validateMatches();
-
+	
 	QString m_filePath;
 	QPlainTextEdit* m_textEdit;
 	QVector<SearchMatch> m_matches;
