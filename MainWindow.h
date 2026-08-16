@@ -53,6 +53,7 @@ private:
 	int findOpenTab(const QString& filePath);
 	void switchToTab(int index);
 	void addNewTab(const QString& filePath, const QVector<SearchMatch>& matches);
+	void closeTab(int index);
 
 	Settings cfg;
 	QTabWidget* m_tabWidget;
@@ -60,6 +61,5 @@ private:
 	SearchDock* m_searchDock;
 	QAction* m_openAsTextAction;
 	QMap<QString, QVector<SearchMatch>> m_fileMatches;
-	QMap<QString, QString> m_fileTexts;                // путь файла -> текст файла (для быстрого открытия)
 	QMap<QString, int> m_openTabs; // путь файла -> индекс вкладки
 };

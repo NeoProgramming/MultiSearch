@@ -23,7 +23,7 @@ public:
 	QString getFilePath() const { return m_filePath; }
 	QString getTabTitle() const { return QFileInfo(m_filePath).fileName(); }
 	void setFocusToTextEdit();
-
+	void updateMatches(const QVector<SearchMatch>& newMatches);
 private slots:
 	void nextMatch();
 	void prevMatch();

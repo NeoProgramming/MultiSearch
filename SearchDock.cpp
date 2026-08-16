@@ -131,6 +131,13 @@ void SearchDock::setupUi()
 	m_resultsView->header()->setSectionResizeMode(1, QHeaderView::Fixed);
 	m_resultsView->setColumnWidth(1, 50);
 
+	// НАСТРОЙКА ЧИСЛОВОЙ СОРТИРОВКИ
+   // Устанавливаем делегат для числовой сортировки
+	m_resultsView->setSortingEnabled(true);
+
+	// Сортируем по умолчанию по убыванию (больше совпадений сверху)
+	m_resultsView->sortByColumn(1, Qt::DescendingOrder);
+
 	resultsLayout->addWidget(m_resultsView);
 
 	// Собираем всё вместе
@@ -356,36 +363,24 @@ void SearchDock::setWholeWords(bool wholewords)
 	m_wholeWordsCheck->setChecked(wholewords);
 }
 
-// Методы для работы с результатами
-void SearchDock::addResult(const QString& fileName, const QString& fullPath, int matchCount)
-{
-	QList<QStandardItem*> row;
-
-	QStandardItem* nameItem = new QStandardItem(fileName);
-	nameItem->setData(fullPath, Qt::UserRole); // Сохраняем полный путь
-	nameItem->setEditable(false);
-
-	QStandardItem* countItem = new QStandardItem(QString::number(matchCount));
-	countItem->setTextAlignment(Qt::AlignCenter);
-	countItem->setEditable(false);
-
-	row << nameItem << countItem;
-	m_resultsModel->appendRow(row);
-}
-
 void SearchDock::addResult(const QString& fileName, const QString& fullPath,
 	int matchCount, const QString& context)
 {
 	QList<QStandardItem*> row;
 
+	// Колонка 0: Имя файла
 	QStandardItem* nameItem = new QStandardItem(fileName);
 	nameItem->setData(fullPath, Qt::UserRole);
 	nameItem->setEditable(false);
 
-	QStandardItem* countItem = new QStandardItem(QString::number(matchCount));
+	// Колонка 1: Количество совпадений (числовое)
+	QStandardItem* countItem = new QStandardItem();
+	countItem->setData(matchCount, Qt::DisplayRole); // Числовое значение для отображения
+	countItem->setData(matchCount, Qt::UserRole + 1); // Сохраняем число для сортировки
 	countItem->setTextAlignment(Qt::AlignCenter);
 	countItem->setEditable(false);
 
+	// Колонка 2: Контекст
 	QStandardItem* contextItem = new QStandardItem(context);
 	contextItem->setEditable(false);
 

@@ -230,4 +230,25 @@ bool TextTab::validateMatches()
 	return true;
 }
 
+void TextTab::updateMatches(const QVector<SearchMatch>& newMatches)
+{
+	// Сохраняем новые совпадения
+	m_matches = newMatches;
+	m_currentMatch = 0;
+
+	// Валидируем совпадения
+	if (!validateMatches()) {
+		qDebug() << "No valid matches after update";
+		m_matchLabel->setText("No matches");
+		return;
+	}
+
+	// Переподсвечиваем
+	highlightMatches();
+
+	// Обновляем статус
+	updateMatchLabel();
+
+	qDebug() << "Updated matches:" << m_matches.size() << "matches";
+}
 

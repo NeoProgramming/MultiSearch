@@ -39,7 +39,6 @@ public:
 	void setWholeWords(bool wholewords);
 
 	// Методы для работы с результатами
-	void addResult(const QString& fileName, const QString& fullPath, int matchCount);
 	void addResult(const QString& fileName, const QString& fullPath,
 		int matchCount, const QString& context);
 	void clearResults();

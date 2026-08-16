@@ -180,11 +180,12 @@ void MainWindow::createTabWidget()
 
 void MainWindow::onTabCloseRequested(int index)
 {
-	// Не закрываем последнюю вкладку
-	if (m_tabWidget->count() > 1) {
-		QWidget* tab = m_tabWidget->widget(index);
-		m_tabWidget->removeTab(index);
+	// Не закрываем единственную вкладку
+	if (m_tabWidget->count() <= 1) {
+		return;
 	}
+
+	closeTab(index);
 }
 
 void MainWindow::onCurrentTabChanged(int index)
@@ -222,7 +223,6 @@ void MainWindow::onSearchRequested()
 	// Очищаем предыдущие результаты
 	m_searchDock->clearResults();
 	m_fileMatches.clear();
-	m_fileTexts.clear();
 
 	// Настройки поиска
 	SearchEngine::Config config;
@@ -305,7 +305,6 @@ void MainWindow::processFile(const QString& filePath,
 
 		// Сохраняем matches
 		m_fileMatches[filePath] = matches;
-		m_fileTexts[filePath] = text; 
 
 		qDebug() << "Saved" << matches.size() << "matches for" << filePath;
 		// Для отладки выведем первые несколько позиций
@@ -342,39 +341,6 @@ void MainWindow::onFileDoubleClicked(const QString& filePath)
 	openFileWithHighlights(filePath, matches);
 }
 
-/*
-void MainWindow::onFileDoubleClicked(const QString& filePath)
-{
-	qDebug() << "\n=== Double click ===";
-	qDebug() << "File path:" << filePath;
-
-	// Проверяем, есть ли такой файл в сохраненных результатах
-	if (!m_fileMatches.contains(filePath)) {
-		qDebug() << "ERROR: File not found in m_fileMatches!";
-		qDebug() << "Available files:" << m_fileMatches.keys();
-
-		statusBar()->showMessage("No match data for this file (maybe search was cleared?)", 3000);
-		return;
-	}
-
-	const auto& matches = m_fileMatches[filePath];
-	qDebug() << "Matches count:" << matches.size();
-
-	if (matches.isEmpty()) {
-		qDebug() << "ERROR: Matches list is empty!";
-		statusBar()->showMessage("No matches found in this file", 3000);
-		return;
-	}
-
-	// Проверяем первый match на валидность
-	const auto& firstMatch = matches.first();
-	qDebug() << "First match - start:" << firstMatch.startPos
-		<< "end:" << firstMatch.endPos;
-
-	// Открываем файл с подсветкой
-	openFileWithHighlights(filePath, matches);
-}*/
-
 void MainWindow::openFileWithHighlights(const QString& filePath,
 	const QVector<SearchMatch>& matches)
 {
@@ -382,18 +348,14 @@ void MainWindow::openFileWithHighlights(const QString& filePath,
 	int existingTabIndex = findOpenTab(filePath);
 
 	if (existingTabIndex != -1) {
-		// Файл уже открыт - просто переключаемся на вкладку
-		switchToTab(existingTabIndex);
-
-		// Обновляем подсветку, если нужно (например, если поиск был обновлен)
-		// Но можно пропустить, так как пользователь уже видел этот файл
-
-		statusBar()->showMessage(QString("Switched to '%1'").arg(QFileInfo(filePath).fileName()), 2000);
-		return;
+		// Закрываем старую вкладку
+		closeTab(existingTabIndex);
+		// Удаляем из кэша (closeTab уже удаляет, но на всякий случай)
+		m_openTabs.remove(filePath);
 	}
 
-	// Файл не открыт - создаем новую вкладку
-	addNewTab(filePath, matches);
+	// Создаем новую вкладку с актуальными данными
+	addNewTab(filePath, matches);	
 }
 
 int MainWindow::findOpenTab(const QString& filePath)
@@ -472,8 +434,6 @@ void MainWindow::switchToTab(int index)
 
 			// Для QWebEngineView - фокус устанавливается автоматически
 		}
-
-		//m_tabWidget->widget(index)->setFocus();
 	}
 }
 
@@ -530,13 +490,13 @@ void MainWindow::addNewTab(const QString& filePath,
 
 	}
 	else {
-		// Для текстовых файлов используем TextTab
-		if (!m_fileTexts.contains(filePath)) {
-			qWarning() << "No saved text for" << filePath;
+		// Для текстовых файлов загружаем текст ЗАНОВО
+		QString text = FileExtractor::loadFile(filePath, FileExtractor::ExtractTextOnly);
+		if (text.isEmpty()) {
+			qWarning() << "Failed to load text for:" << filePath;
 			return;
 		}
 
-		QString text = m_fileTexts[filePath];
 		TextTab* tab = new TextTab(filePath, text, matches);
 
 		newIndex = m_tabWidget->addTab(tab, fileInfo.fileName());
@@ -561,131 +521,6 @@ void MainWindow::addNewTab(const QString& filePath,
 			this, &MainWindow::onTabCloseRequested);
 	}
 }
-/*
-void MainWindow::onTabCloseRequested(int index)
-{
-	if (index < 0 || index >= m_tabWidget->count()) return;
-
-	// Не закрываем последнюю вкладку
-	if (m_tabWidget->count() <= 1) {
-		return;
-	}
-
-	QWidget* widget = m_tabWidget->widget(index);
-
-	// Удаляем из кэша
-	QString filePathToRemove;
-	for (auto it = m_openTabs.begin(); it != m_openTabs.end(); ++it) {
-		if (it.value() == index) {
-			filePathToRemove = it.key();
-			break;
-		}
-	}
-
-	if (!filePathToRemove.isEmpty()) {
-		m_openTabs.remove(filePathToRemove);
-	}
-
-	// Удаляем вкладку
-	m_tabWidget->removeTab(index);
-	delete widget;
-
-	// Обновляем индексы в кэше для вкладок после удаленной
-	for (auto it = m_openTabs.begin(); it != m_openTabs.end(); ++it) {
-		if (it.value() > index) {
-			it.value()--;
-		}
-	}
-}
-
-
-void MainWindow::openFileWithHighlights(const QString& filePath,
-	const QVector<SearchMatch>& matches)
-{
-	qDebug() << "\n=== openFileWithHighlights ===";
-	qDebug() << "File path:" << filePath;
-	qDebug() << "Matches count:" << matches.size();
-
-	QFileInfo fileInfo(filePath);
-
-	// Проверяем существование файла
-	if (!fileInfo.exists()) {
-		qDebug() << "ERROR: File does not exist!";
-		statusBar()->showMessage("File does not exist: " + filePath, 3000);
-		return;
-	}
-
-	qDebug() << "File size:" << fileInfo.size();
-	qDebug() << "File suffix:" << fileInfo.suffix();
-
-	// Загружаем текст файла для проверки
-	QString text = FileExtractor::loadFile(filePath, FileExtractor::ExtractFull);
-	qDebug() << "Loaded text length:" << text.length();
-
-	if (text.isEmpty()) {
-		qDebug() << "ERROR: Loaded text is empty!";
-		statusBar()->showMessage("File is empty or could not be read", 3000);
-
-		// Показываем заглушку вместо падения
-		QWebEngineView* view = new QWebEngineView();
-		view->setHtml("<html><body><h2>Error: Empty file or cannot read</h2>"
-			"<p>File: " + filePath + "</p></body></html>");
-		int index = m_tabWidget->addTab(view, fileInfo.fileName());
-		m_tabWidget->setCurrentIndex(index);
-		return;
-	}
-
-	// Проверяем matches на валидность
-	QVector<SearchMatch> validMatches;
-	for (const auto& match : matches) {
-		if (match.startPos >= 0 && match.endPos <= text.length() &&
-			match.startPos < match.endPos) {
-			validMatches.append(match);
-		}
-		else {
-			qDebug() << "WARNING: Invalid match - start:" << match.startPos
-				<< "end:" << match.endPos << "text length:" << text.length();
-		}
-	}
-
-	qDebug() << "Valid matches count:" << validMatches.size();
-
-	if (validMatches.isEmpty()) {
-		qDebug() << "ERROR: No valid matches!";
-		statusBar()->showMessage("No valid matches found in file", 3000);
-
-		// Показываем файл без подсветки
-		QWebEngineView* view = new QWebEngineView();
-		view->setHtml("<html><body><pre>" + text.toHtmlEscaped() + "</pre></body></html>");
-		int index = m_tabWidget->addTab(view, fileInfo.fileName());
-		m_tabWidget->setCurrentIndex(index);
-		return;
-	}
-
-	QString extension = fileInfo.suffix().toLower();
-	bool isHtml = (extension == "html" || extension == "htm");
-	bool isMhtml = (extension == "mht" || extension == "mhtml");
-
-	try {
-		if (isHtml || isMhtml) {
-			qDebug() << "Opening as HTML/MHTML";
-			openHtmlWithHighlights(filePath, validMatches, text);
-		}
-		else {
-			qDebug() << "Opening as text";
-			openTextWithHighlights(filePath, validMatches, text);
-		}
-	}
-	catch (const std::exception& e) {
-		qDebug() << "EXCEPTION:" << e.what();
-		statusBar()->showMessage("Error opening file: " + QString(e.what()), 3000);
-	}
-	catch (...) {
-		qDebug() << "UNKNOWN EXCEPTION";
-		statusBar()->showMessage("Unknown error opening file", 3000);
-	}
-}
-*/
 
 void MainWindow::openHtmlWithHighlights(const QString& filePath,
 	const QVector<SearchMatch>& matches,
@@ -944,4 +779,51 @@ void MainWindow::createTextTab(const QString& title, const QString& text)
 
 	int index = m_tabWidget->addTab(view, title);
 	m_tabWidget->setCurrentIndex(index);
+}
+
+void MainWindow::closeTab(int index)
+{
+	if (index < 0 || index >= m_tabWidget->count()) {
+		return;
+	}
+
+	// Получаем виджет вкладки
+	QWidget* widget = m_tabWidget->widget(index);
+	if (!widget) {
+		return;
+	}
+
+	// Удаляем из кэша открытых вкладок
+	for (auto it = m_openTabs.begin(); it != m_openTabs.end(); ++it) {
+		if (it.value() == index) {
+			m_openTabs.erase(it);
+			break;
+		}
+	}
+
+	// Удаляем вкладку
+	m_tabWidget->removeTab(index);
+
+	// Обновляем индексы в кэше для вкладок после удаленной
+	for (auto it = m_openTabs.begin(); it != m_openTabs.end(); ++it) {
+		if (it.value() > index) {
+			it.value()--;
+		}
+	}
+
+	// Удаляем виджет (QTabWidget не удаляет автоматически при removeTab)
+	delete widget;
+
+	// Если осталась только одна вкладка и это приветственная - показываем ее
+	if (m_tabWidget->count() == 0) {
+		// Создаем приветственную вкладку
+		QWebEngineView* welcomeView = new QWebEngineView();
+		welcomeView->setHtml(
+			"<html><body style='font-family: sans-serif; padding: 20px;'>"
+			"<h1>Search Results</h1>"
+			"<p>Double-click on a file in the search results to open it here.</p>"
+			"</body></html>"
+		);
+		m_tabWidget->addTab(welcomeView, "Welcome");
+	}
 }
