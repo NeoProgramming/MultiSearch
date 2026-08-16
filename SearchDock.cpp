@@ -17,14 +17,14 @@
 #include <QCheckBox>
 #include <QTreeView>
 #include <QStandardItemModel>
-
+#include <QComboBox>
 
 
 
 
 SearchDock::SearchDock(QWidget *parent)
 	: QWidget(parent)
-	, m_pathEdit(nullptr)
+	, m_pathCombo(nullptr)
 	, m_browseFileButton(nullptr)
 	, m_browseFolderButton(nullptr)
 	, m_wordsEdit(nullptr)
@@ -50,20 +50,29 @@ void SearchDock::setupUi()
 	QGroupBox* pathGroup = new QGroupBox("Search Path", this);
 	QVBoxLayout* pathLayout = new QVBoxLayout(pathGroup);
 
-	// Поле для пути
-	m_pathEdit = new QLineEdit(this);
-	m_pathEdit->setPlaceholderText("Enter file or folder path...");
+	// Комбобокс для путей
+	m_pathCombo = new QComboBox(this);
+	m_pathCombo->setEditable(true);
+	m_pathCombo->setInsertPolicy(QComboBox::NoInsert); // Не добавлять автоматически
+	m_pathCombo->setDuplicatesEnabled(false);
+//	m_pathCombo->setPlaceholderText("Enter file or folder path...");
+	
 
 	// Ряд с кнопками
 	QHBoxLayout* buttonLayout = new QHBoxLayout;
 	m_browseFileButton = new QPushButton("Select File...", this);
 	m_browseFolderButton = new QPushButton("Select Folder...", this);
+	m_removePathButton = new QPushButton("Forget", this);
+	m_removePathButton->setToolTip("Remove current path from history");
+	m_removePathButton->setFixedWidth(50);
+	m_removePathButton->setEnabled(false);
 
 	buttonLayout->addWidget(m_browseFileButton);
 	buttonLayout->addWidget(m_browseFolderButton);
 	buttonLayout->addStretch();
+	buttonLayout->addWidget(m_removePathButton);
 
-	pathLayout->addWidget(m_pathEdit);
+	pathLayout->addWidget(m_pathCombo);
 	pathLayout->addLayout(buttonLayout);
 	pathGroup->setLayout(pathLayout);
 
@@ -130,6 +139,10 @@ void SearchDock::setupUi()
 	mainLayout->addWidget(resultsGroup);
 
 	// Подключаем сигналы
+	connect(m_pathCombo, &QComboBox::editTextChanged,
+		this, &SearchDock::onPathComboChanged);
+	connect(m_removePathButton, &QPushButton::clicked,
+		this, &SearchDock::onRemovePathClicked);
 	connect(m_browseFileButton, &QPushButton::clicked, this, &SearchDock::onBrowseFileClicked);
 	connect(m_browseFolderButton, &QPushButton::clicked, this, &SearchDock::onBrowseFolderClicked);
 	connect(m_searchButton, &QPushButton::clicked, this, &SearchDock::onSearchClicked);
@@ -149,12 +162,15 @@ void SearchDock::onBrowseFileClicked()
 	QString filePath = QFileDialog::getOpenFileName(
 		this,
 		"Select File",
-		m_pathEdit->text(),
+		m_pathCombo->currentText(), // Начинаем с текущего пути
 		"All Files (*.*);;HTML Files (*.html *.htm);;Text Files (*.txt);;MHTML Files (*.mht *.mhtml)"
 	);
 
 	if (!filePath.isEmpty()) {
-		m_pathEdit->setText(filePath);
+		m_pathCombo->setEditText(filePath);
+		// Добавляем путь в список при выборе
+		addSearchPath(filePath);
+		emit searchPathChanged(filePath);
 	}
 }
 
@@ -163,17 +179,43 @@ void SearchDock::onBrowseFolderClicked()
 	QString folderPath = QFileDialog::getExistingDirectory(
 		this,
 		"Select Folder",
-		m_pathEdit->text(),
+		m_pathCombo->currentText(), // Начинаем с текущего пути
 		QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
 	);
 
 	if (!folderPath.isEmpty()) {
-		m_pathEdit->setText(folderPath);
+		m_pathCombo->setEditText(folderPath);
+		addSearchPath(folderPath);
+		emit searchPathChanged(folderPath);
+	}
+}
+
+void SearchDock::onPathComboChanged(const QString& text)
+{
+	// Обновляем состояние кнопки удаления
+	bool isInList = m_pathCombo->findText(text) >= 0;
+	m_removePathButton->setEnabled(isInList && !text.isEmpty());
+
+	emit searchPathChanged(text);
+}
+
+void SearchDock::onRemovePathClicked()
+{
+	QString currentPath = m_pathCombo->currentText();
+	if (!currentPath.isEmpty()) {
+		removeSearchPath(currentPath);
 	}
 }
 
 void SearchDock::onSearchClicked()
 {
+	QString currentPath = m_pathCombo->currentText().trimmed();
+	if (!currentPath.isEmpty()) {
+		// Добавляем путь в историю если его там нет
+		addSearchPath(currentPath);
+		// Сохраняем текущий путь как последний использованный
+		emit searchPathChanged(currentPath);
+	}
 	emit searchRequested();
 }
 
@@ -191,7 +233,7 @@ void SearchDock::onResultDoubleClicked(const QModelIndex& index)
 // Геттеры
 QString SearchDock::getSearchPath() const
 {
-	return m_pathEdit->text().trimmed();
+	return m_pathCombo->currentText().trimmed();
 }
 
 QStringList SearchDock::getSearchWords() const
@@ -216,7 +258,82 @@ bool SearchDock::isWholeWords() const
 
 void SearchDock::setSearchPath(const QString& path)
 {
-	m_pathEdit->setText(path);
+	if (!path.isEmpty()) {
+		m_pathCombo->setEditText(path);
+		// Добавляем в историю
+		addSearchPath(path);
+		emit searchPathChanged(path);
+	}
+}
+
+void SearchDock::setSearchPaths(const QStringList& paths)
+{
+	m_pathCombo->clear();
+	for (const QString& path : paths) {
+		if (!path.isEmpty()) {
+			m_pathCombo->addItem(path);
+		}
+	}
+	// Если есть пути - выбираем последний
+	if (!paths.isEmpty()) {
+		m_pathCombo->setCurrentIndex(0);
+	}
+}
+
+QStringList SearchDock::getSearchPaths() const
+{
+	QStringList paths;
+	for (int i = 0; i < m_pathCombo->count(); ++i) {
+		QString path = m_pathCombo->itemText(i);
+		if (!path.isEmpty()) {
+			paths.append(path);
+		}
+	}
+	return paths;
+}
+
+void SearchDock::addSearchPath(const QString& path)
+{
+	if (path.isEmpty()) return;
+
+	int index = m_pathCombo->findText(path);
+	if (index >= 0) {
+		// Уже есть - перемещаем вверх
+		m_pathCombo->removeItem(index);
+	}
+
+	// Вставляем в начало
+	m_pathCombo->insertItem(0, path);
+	m_pathCombo->setCurrentIndex(0);
+
+	updateRemoveButtonState();
+}
+
+void SearchDock::removeSearchPath(const QString& path)
+{
+	if (path.isEmpty()) return;
+
+	int index = m_pathCombo->findText(path);
+	if (index >= 0) {
+		m_pathCombo->removeItem(index);
+		// Если список не пуст, выбираем первый элемент
+		if (m_pathCombo->count() > 0) {
+			m_pathCombo->setCurrentIndex(0);
+		}
+		else {
+			m_pathCombo->setEditText("");
+		}
+		emit searchPathRemoved(path);
+	}
+
+	updateRemoveButtonState();
+}
+
+void SearchDock::updateRemoveButtonState()
+{
+	QString currentText = m_pathCombo->currentText();
+	bool isInList = m_pathCombo->findText(currentText) >= 0;
+	m_removePathButton->setEnabled(isInList && !currentText.isEmpty());
 }
 
 void SearchDock::setSearchWords(const QString& words)

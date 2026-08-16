@@ -51,6 +51,16 @@ void MainWindow::restoreUi()
 	m_searchDock->setCaseSensitive(cfg.caseSensitive);
 	m_searchDock->setWholeWords(cfg.wholeWords);
 
+	// Восстанавливаем историю путей
+	if (!cfg.searchPaths.isEmpty()) {
+		m_searchDock->setSearchPaths(cfg.searchPaths);
+	}
+
+	// Восстанавливаем текущий путь (может быть не в списке)
+	if (!cfg.searchPath.isEmpty()) {
+		m_searchDock->setSearchPath(cfg.searchPath);
+	}
+
 	qDebug() << "UI restored";
 }
 
@@ -61,6 +71,7 @@ MainWindow::~MainWindow()
 	cfg.windowState = saveState();
 
 	cfg.searchPath = m_searchDock->getSearchPath();
+	cfg.searchPaths = m_searchDock->getSearchPaths();
 	cfg.searchWords = m_searchDock->getSearchWords().join(" ");
 	cfg.searchRadius = m_searchDock->getSearchRadius();
 	cfg.caseSensitive = m_searchDock->isCaseSensitive();

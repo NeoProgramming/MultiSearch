@@ -8,6 +8,7 @@ class QSpinBox;
 class QCheckBox;
 class QTreeView;
 class QStandardItemModel;
+class QComboBox;
 
 class SearchDock  : public QWidget
 {
@@ -19,6 +20,7 @@ public:
 
 	// Геттеры для доступа к данным из MainWindow
 	QString getSearchPath() const;
+	QStringList getSearchPaths() const;
 	QStringList getSearchWords() const;
 	int getSearchRadius() const;
 	bool isCaseSensitive() const;
@@ -26,6 +28,11 @@ public:
 
 	// Новые методы для установки значений
 	void setSearchPath(const QString& path);
+	void setSearchPaths(const QStringList& paths);
+		
+	void addSearchPath(const QString& path);
+	void removeSearchPath(const QString& path);
+
 	void setSearchWords(const QString& words);
 	void setSearchRadius(int radius);
 	void setCaseSensitive(bool sensitive);
@@ -43,21 +50,26 @@ signals:
 	// Сигнал для запуска поиска
 	void searchRequested();
 	void fileDoubleClicked(const QString& filePath);
+	void searchPathChanged(const QString& path);
+	void searchPathRemoved(const QString& path);
 
 private slots:
 	void onBrowseFileClicked();
 	void onBrowseFolderClicked();
 	void onSearchClicked();
 	void onResultDoubleClicked(const QModelIndex& index);
-
+	void onPathComboChanged(const QString& text);
+	void onRemovePathClicked();
 private:
 	void setupUi();
 	void updateResultsCount();
+	void updateRemoveButtonState();
 
 	// Элементы управления
-	QLineEdit* m_pathEdit;
+	QComboBox* m_pathCombo;
 	QPushButton* m_browseFileButton;
 	QPushButton* m_browseFolderButton;
+	QPushButton* m_removePathButton;
 	QLineEdit* m_wordsEdit;
 	QSpinBox* m_radiusSpin;
 	QCheckBox* m_caseSensitiveCheck;
